@@ -7,10 +7,12 @@ import {
   Platform,
   TextInput,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import colors from 'config/colors';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
+import { useMutation } from "@tanstack/react-query";
 import { radius, spacingX, spacingY } from 'config/spacing';
 import Typo from 'components/Typo';
 import { normalizeY } from 'utils/normalize';
@@ -18,15 +20,53 @@ import { Octicons } from '@expo/vector-icons';
 import AppButton from 'components/AppButton';
 import { useNavigation } from '@react-navigation/native';
 import useAuth from 'auth/useAuth';
+import axios from 'axios';
+import baseURL from '../assets/common/baseURL';
+import { loginAction } from '../redux/authSlice';
+import AuthContext from '../auth/AuthContext';
+import { useDispatch } from 'react-redux';
 const { width, height } = Dimensions.get('screen');
 let paddingTop = Platform.OS === 'ios' ? height * 0.07 : spacingY._10;
 
 function SigninScreen(props) {
   const Auth = useAuth();
+  const dispatch = useDispatch();
   const navigation = useNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSecure, setIsSecure] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const { user, setUser } = useContext(AuthContext);
+
+  const loginUser = async () => {
+    const response = await axios.post(`${baseURL}/login`,
+      { email, password }
+    );
+    return response.data;
+  }
+
+  const mutation = useMutation({
+    mutationFn: loginUser,
+    mutationKey: ["login"],
+  });
+
+  const handleSignIn = async () => {
+    setIsLoading(true);
+    mutation.mutateAsync({ email, password })
+      .then((data) => { 
+        dispatch(loginAction(data));
+        setUser(data);
+        navigation.navigate("HomeScreen");
+      })
+      .catch((error) => {
+        setIsLoading(false);
+        Alert.alert(
+          "Login Failed", "Your Email or Password is Incorrect. Try Again",
+          [{ text: "OK" }]
+        );
+      });
+  };
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.background}>
@@ -53,6 +93,7 @@ function SigninScreen(props) {
             onChangeText={setEmail}
             placeholder="Enter email"
             style={styles.input}
+            keyboardType="email-address"
           />
         </View>
         <View style={styles.inputView}>
@@ -75,20 +116,16 @@ function SigninScreen(props) {
         </View>
         <Typo style={styles.recoverTxt}>Forgot Password</Typo>
         <AppButton
-          onPress={() => Auth.setUser('123')}
+          onPress={() => handleSignIn()}
           label={'Sign in'}
           style={{ backgroundColor: '#D84040', borderRadius: radius._12 }}
         />
 
         <View style={styles.orContinueRow}>
           <View style={styles.line} />
-          <Typo>or continue with</Typo>
           <View style={styles.line} />
-        </View>
-        <View style={[styles.orContinueRow, { width: '85%', gap: spacingX._15 }]}>
-          <Icon icon={require('../assets/google.png')} />
-          <Icon icon={require('../assets/apple.png')} />
-          <Icon icon={require('../assets/facebook.png')} />
+          <View style={styles.line} />
+          <View style={styles.line} />
         </View>
         <TouchableOpacity
           style={[styles.orContinueRow, { gap: spacingX._5, marginTop: '15%' }]}

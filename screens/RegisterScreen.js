@@ -6,7 +6,10 @@ import {
   Dimensions,
   Platform,
   TextInput,
+  Text,
   TouchableOpacity,
+  StatusBar,
+  Alert,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import colors from 'config/colors';
@@ -18,18 +21,95 @@ import { Octicons } from '@expo/vector-icons';
 import AppButton from 'components/AppButton';
 import { useNavigation } from '@react-navigation/native';
 import useAuth from 'auth/useAuth';
+import * as Yup from 'yup';
+import * as ImagePicker from 'expo-image-picker';
+import axios from 'axios';
+import baseURL from '../assets/common/baseURL';
 const { width, height } = Dimensions.get('screen');
 let paddingTop = Platform.OS === 'ios' ? height * 0.07 : spacingY._10;
 
+const RegisterSchema = Yup.object().shape({
+  email: Yup.string().email("Invalid email").required("Email is Required"),
+  password: Yup.string().min(4, "Too Short!").required("Required"),
+});
+
 function RegisterScreen(props) {
+  const [avatar, setAvatar] = useState(null);
   const navigation = useNavigation();
   const Auth = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSecure, setIsSecure] = useState(true);
+
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      setAvatar(result.assets[0].uri);
+    }
+  };
+
+  const handleRegister = async () => {
+    try {
+      await RegisterSchema.validate({ email, password });
+
+      const formData = new FormData();
+      formData.append('email', email);
+      formData.append('password', password);
+      formData.append('name', name);
+
+      if (avatar) {
+        const fileName = avatar.split('/').pop();
+        formData.append('avatar', {
+          uri: avatar,
+          type: 'image/jpeg',
+          name: fileName,
+        });
+      }
+      // console.log(formData)
+
+      const response = await axios.post(`${baseURL}/register`, formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        Alert.alert(
+          "Registered Successfully",
+          "You have been registered.",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                navigation.navigate('Signin');
+              },
+            },
+          ]
+        );
+      }
+
+    } catch (error) {
+      if (error instanceof Yup.ValidationError) {
+        // Show alert if validation fails
+        Alert.alert("Invalid Email or Password, Password must be 4 characters and above", error.message);
+      } else {
+        console.error("Error:", error);
+      }
+    }
+  }
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar translucent backgroundColor="transparent" />
       <View style={styles.background}>
         <View style={[styles.c1, { opacity: 0.7 }]} />
         <View style={[styles.pinkCircle, { opacity: 0.7 }]} />
@@ -47,6 +127,18 @@ function RegisterScreen(props) {
             of Shopping Delights!
           </Typo>
         </View>
+        <View style={styles.imageContainer}>
+          <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+            {avatar ? (
+              <Image source={{ uri: avatar }} style={styles.roundImage} />
+            ) : (
+              <>
+                <Text style={styles.placeholderText}>No File Upload</Text>
+                <Text style={styles.placeholderBellowText}>Select Avatar</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
         <View style={styles.inputView}>
           <TextInput
             value={name}
@@ -61,6 +153,7 @@ function RegisterScreen(props) {
             onChangeText={setEmail}
             placeholder="Enter email"
             style={styles.input}
+            keyboardType="email-address"
           />
         </View>
         <View style={styles.inputView}>
@@ -82,10 +175,10 @@ function RegisterScreen(props) {
           )}
         </View>
         <AppButton
-          onPress={() => Auth.setUser('123')}
+          onPress={() => handleRegister()}
           label={'Register'}
           style={{
-            backgroundColor: '#D84040', 
+            backgroundColor: '#D84040',
             borderRadius: radius._12,
             marginTop: spacingY._40,
           }}
@@ -93,13 +186,9 @@ function RegisterScreen(props) {
 
         <View style={styles.orContinueRow}>
           <View style={styles.line} />
-          <Typo>or continue with</Typo>
           <View style={styles.line} />
-        </View>
-        <View style={[styles.orContinueRow, { width: '85%', gap: spacingX._15 }]}>
-          <Icon icon={require('../assets/google.png')} />
-          <Icon icon={require('../assets/apple.png')} />
-          <Icon icon={require('../assets/facebook.png')} />
+          <View style={styles.line} />
+          <View style={styles.line} />
         </View>
         <TouchableOpacity
           style={[styles.orContinueRow, { gap: spacingX._5, marginTop: '15%' }]}
@@ -216,6 +305,35 @@ const styles = StyleSheet.create({
     height: 1,
     width: '20%',
     backgroundColor: colors.black,
+  },
+  imageContainer: {
+    marginBottom: 16,
+    alignItems: "center",
+  },
+  imagePicker: {
+    width: 150,
+    height: 150,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 75,
+    backgroundColor: "#e9e9e9",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  roundImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 75,
+  },
+  placeholderText: {
+    color: "#888",
+    textAlign: "center",
+  },
+  placeholderBellowText: {
+    color: "#888",
+    textAlign: "center",
+    fontSize: 12,
   },
 });
 
