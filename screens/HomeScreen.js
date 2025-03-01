@@ -1,5 +1,7 @@
 import { Entypo, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import baseURL from 'assets/common/baseURL';
+import axios from 'axios';
 import CategoryItem from 'components/CategoryItem';
 import ImageSlideShow from 'components/ImageSlideShow';
 import ProductCard from 'components/ProductCard';
@@ -9,23 +11,46 @@ import Typo from 'components/Typo';
 import colors from 'config/colors';
 import { radius, spacingX, spacingY } from 'config/spacing';
 import FilterModal from 'model/FilterModal';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, FlatList, ScrollView, Image, TouchableOpacity } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
-import { products, categories } from 'utils/data';
+// import { products, categories } from 'utils/data';
 import { normalizeX, normalizeY } from 'utils/normalize';
 
 function HomeScreen({ navigation }) {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selected, setSelected] = useState('All');
-  const [data, setData] = useState(products);
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [data, setData] = useState([]);
   const [key, setKey] = useState(0);
+
+  const fetchData = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/product/get-products-and-categories`);
+      setProducts(response.data.products)
+      setData(response.data.products)
+      setCategories(response.data.categories)
+    } catch (err) {
+      console.log(err.message)
+    }
+  }
 
   // useFocusEffect(
   //   useCallback(() => {
-  //     setKey((prevKey) => prevKey + 1);
   //   }, [])
   // );
+  useEffect(() => {
+    fetchData();
+  }, [])
+  useEffect(() => {
+    // fetchData();
+    // console.log('Updated Data:', data);
+  }, [data])
+
+  // console.log('Products: ', products);
+  // console.log('Categories: ', categories);
+  // console.log('Data: ', data);
 
   const handleFilter = (category) => {
     setSelected(category);
@@ -84,13 +109,12 @@ function HomeScreen({ navigation }) {
           </Typo>
           <Typo style={{ color: colors.gray }}>See all</Typo>
         </View>
-        {/* <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}> */}
         {data.length > 0 && (
           <FlatList
             scrollEnabled={false}
             numColumns={2}
             data={data}
-            keyExtractor={(item, index) => index.toString()}
+            keyExtractor={(item) => item._id.toString()}
             contentContainerStyle={{
               gap: spacingX._20,
               paddingHorizontal: spacingX._20,
@@ -111,8 +135,6 @@ function HomeScreen({ navigation }) {
             }}
           />
         )}
-
-        {/* </ScrollView> */}
       </ScrollView>
       <FilterModal visible={filterModalVisible} setVisible={setFilterModalVisible} />
     </ScreenComponent>

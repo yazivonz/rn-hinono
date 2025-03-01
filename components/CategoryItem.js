@@ -7,6 +7,7 @@ import { radius, spacingY } from 'config/spacing';
 import colors from 'config/colors';
 
 const CategoryItem = ({ item, isSelected, onPress, index, keyValue }) => {
+  // console.log(item.image[0]?.url, 'Category Image')
   return (
     <Animated.View
       key={`${keyValue}-${index}`}
@@ -22,10 +23,10 @@ const CategoryItem = ({ item, isSelected, onPress, index, keyValue }) => {
           style={[
             styles.imgContainer,
             {
-              borderColor: isSelected ? '#D84040' : colors.white, // Updated border color
+              borderColor: isSelected ? '#D84040' : colors.white,
             },
           ]}>
-          <Image source={item.image} style={[styles.catImg]} />
+          <Image source={{ uri: item.image[0]?.url }} style={styles.catImg} />
         </View>
 
         <Typo
@@ -46,12 +47,12 @@ const styles = StyleSheet.create({
   },
   imgContainer: {
     padding: 9,
-    backgroundColor: colors.lighterGray,
-    borderWidth: normalizeY(2),
-    borderRadius: radius._30,
-    height: normalizeY(52),
-    width: normalizeY(52),
-    marginBottom: spacingY._5,
+    backgroundColor: 'gray',
+    borderWidth: 2,
+    borderRadius: 30,
+    height: 52,
+    width: 52,
+    marginBottom: 5,
   },
   catImg: {
     height: '100%',
