@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import colors from 'config/colors';
-import { useContext, useState } from 'react';
+import { useContext, useState, useCallback, useMemo, memo } from 'react';
 import { useMutation } from "@tanstack/react-query";
 import { radius, spacingX, spacingY } from 'config/spacing';
 import Typo from 'components/Typo';
@@ -25,112 +25,178 @@ import baseURL from '../assets/common/baseURL';
 import { loginAction } from '../redux/authSlice';
 import AuthContext from '../auth/AuthContext';
 import { useDispatch } from 'react-redux';
-const { width, height } = Dimensions.get('screen');
-let paddingTop = Platform.OS === 'ios' ? height * 0.07 : spacingY._10;
 
-function SigninScreen(props) {
+const { width, height } = Dimensions.get('screen');
+
+// Memoize the Icon component to prevent unnecessary re-renders
+const Icon = memo(({ icon }) => {
+  return (
+    <TouchableOpacity style={styles.iconBg}>
+      <Image source={icon} style={styles.icon} />
+    </TouchableOpacity>
+  );
+});
+
+// Background components wrapped in memo to prevent re-rendering
+const BackgroundElements = memo(() => (
+  <View style={styles.background}>
+    <View style={[styles.c1, { opacity: 0.5 }]} />
+    <View style={[styles.orangeCircle, { bottom: '25%', left: '5%', opacity: 0.5 }]} />
+    <View style={[styles.orangeCircle, { opacity: 0.4 }]} />
+    <View style={styles.c2} />
+  </View>
+));
+
+function SigninScreen() {
+  // Hooks
   const Auth = useAuth();
   const dispatch = useDispatch();
   const navigation = useNavigation();
+  const { user, setUser } = useContext(AuthContext);
+  
+  // State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSecure, setIsSecure] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { user, setUser } = useContext(AuthContext);
+  // Memoize the paddingTop value
+  const paddingTop = useMemo(() => 
+    Platform.OS === 'ios' ? height * 0.07 : spacingY._10,
+  []);
 
-  const loginUser = async () => {
-    const response = await axios.post(`${baseURL}/login`,
-      { email, password }
-    );
-    return response.data;
-  }
+  // Memoized welcome text to prevent re-rendering
+  const welcomeText = useMemo(() => (
+    <View style={{ marginVertical: '5%' }}>
+      <Typo size={20} style={styles.body}>
+        Welcome back you've
+      </Typo>
+      <Typo size={20} style={styles.body}>
+        been missed!
+      </Typo>
+    </View>
+  ), []);
 
-  const mutation = useMutation({
-    mutationFn: loginUser,
-    mutationKey: ["login"],
+  // Optimized input handlers
+  const handleEmailChange = useCallback((text) => {
+    setEmail(text);
+  }, []);
+
+  const handlePasswordChange = useCallback((text) => {
+    setPassword(text);
+  }, []);
+
+  const togglePasswordVisibility = useCallback(() => {
+    setIsSecure(prev => !prev);
+  }, []);
+
+  // Optimized navigation handler
+  const navigateToRegister = useCallback(() => {
+    navigation.navigate('Register');
+  }, [navigation]);
+
+  // Optimized login mutation
+  const loginMutation = useMutation({
+    mutationFn: () => {
+      return axios.post(`${baseURL}/login`, { email, password });
+    },
+    onSuccess: (response) => {
+      const data = response.data;
+      dispatch(loginAction(data));
+      setUser(data);
+ 
+    },
+    onError: (error) => {
+      console.error("Login error:", error);
+      Alert.alert(
+        "Login Failed", 
+        "Your Email or Password is Incorrect. Try Again",
+        [{ text: "OK" }]
+      );
+    },
+    onSettled: () => {
+      setIsLoading(false);
+    }
   });
 
-  const handleSignIn = async () => {
+  // Optimized sign in handler
+  const handleSignIn = useCallback(() => {
+    if (!email || !password) {
+      Alert.alert("Missing Information", "Please enter both email and password");
+      return;
+    }
+    
     setIsLoading(true);
-    mutation.mutateAsync({ email, password })
-      .then((data) => { 
-        dispatch(loginAction(data));
-        setUser(data);
-        navigation.navigate("HomeScreen");
-      })
-      .catch((error) => {
-        setIsLoading(false);
-        Alert.alert(
-          "Login Failed", "Your Email or Password is Incorrect. Try Again",
-          [{ text: "OK" }]
-        );
-      });
-  };
+    loginMutation.mutate();
+  }, [email, password, loginMutation]);
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.background}>
-        <View style={[styles.c1, { opacity: 0.5 }]} />
-        <View style={[styles.orangeCircle, { bottom: '25%', left: '5%', opacity: 0.5 }]} />
-        <View style={[styles.orangeCircle, { opacity: 0.4 }]} />
-        <View style={styles.c2} />
-      </View>
-      <BlurView intensity={100} tint="light" style={styles.blurContainer}>
+      <BackgroundElements />
+      <BlurView 
+        intensity={100} 
+        tint="light" 
+        style={[styles.blurContainer, { paddingTop }]}
+      >
         <Typo size={26} style={styles.text}>
           Hello Again!
         </Typo>
-        <View style={{ marginVertical: '5%' }}>
-          <Typo size={20} style={styles.body}>
-            Welcome back you've
-          </Typo>
-          <Typo size={20} style={styles.body}>
-            been missed!
-          </Typo>
-        </View>
+        
+        {welcomeText}
+        
         <View style={styles.inputView}>
           <TextInput
             value={email}
-            onChangeText={setEmail}
+            onChangeText={handleEmailChange}
             placeholder="Enter email"
             style={styles.input}
             keyboardType="email-address"
+            autoCapitalize="none"
           />
         </View>
+        
         <View style={styles.inputView}>
           <TextInput
             value={password}
-            onChangeText={setPassword}
+            onChangeText={handlePasswordChange}
             placeholder="Password"
             style={styles.input}
             secureTextEntry={isSecure}
           />
-          {isSecure ? (
-            <TouchableOpacity onPress={() => setIsSecure(false)}>
-              <Octicons name="eye-closed" size={20} color="grey" />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={() => setIsSecure(true)}>
-              <Octicons name="eye" size={20} color="grey" />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity onPress={togglePasswordVisibility}>
+            <Octicons 
+              name={isSecure ? "eye-closed" : "eye"} 
+              size={20} 
+              color="grey" 
+            />
+          </TouchableOpacity>
         </View>
+        
         <Typo style={styles.recoverTxt}>Forgot Password</Typo>
+        
         <AppButton
-          onPress={() => handleSignIn()}
-          label={'Sign in'}
-          style={{ backgroundColor: '#D84040', borderRadius: radius._12 }}
+          onPress={handleSignIn}
+          label={isLoading ? 'Signing in...' : 'Sign in'}
+          disabled={isLoading || loginMutation.isPending}
+          style={{ 
+            backgroundColor: '#D84040', 
+            borderRadius: radius._12,
+            opacity: isLoading ? 0.7 : 1 
+          }}
         />
 
-        <View style={styles.orContinueRow}>
+        <View style={styles.divider}>
           <View style={styles.line} />
           <View style={styles.line} />
           <View style={styles.line} />
           <View style={styles.line} />
         </View>
+        
         <TouchableOpacity
-          style={[styles.orContinueRow, { gap: spacingX._5, marginTop: '15%' }]}
-          onPress={() => navigation.navigate('Register')}>
-          <Typo>Not a memeber?</Typo>
+          style={styles.registerRow}
+          onPress={navigateToRegister}
+        >
+          <Typo>Not a member?</Typo>
           <Typo style={{ color: colors.blue }}>Register now</Typo>
         </TouchableOpacity>
       </BlurView>
@@ -138,21 +204,12 @@ function SigninScreen(props) {
   );
 }
 
-const Icon = ({ icon }) => {
-  return (
-    <TouchableOpacity style={styles.iconBg}>
-      <Image source={icon} style={styles.icon} />
-    </TouchableOpacity>
-  );
-};
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   blurContainer: {
     ...StyleSheet.absoluteFill,
-    paddingTop: paddingTop,
     padding: spacingY._20,
     paddingBottom: '10%',
     textAlign: 'center',
@@ -224,12 +281,19 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  orContinueRow: {
+  divider: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'center',
     gap: spacingY._10,
     marginTop: '10%',
+  },
+  registerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: spacingX._5,
+    marginTop: '15%',
   },
   iconBg: {
     flex: 1,
@@ -251,4 +315,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SigninScreen;
+export default memo(SigninScreen);
