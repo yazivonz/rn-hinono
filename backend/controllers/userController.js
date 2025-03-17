@@ -76,3 +76,98 @@ exports.loginUser = async (req, res, next) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+
+exports.getUserProfile = async (req, res, next) => {
+  try {
+    // The user ID is available from the authentication middleware
+    const userId = req.user.id;
+    
+    // Find user by ID, but don't include password
+    const user = await User.findById(userId).select("-password");
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      user
+    });
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching profile"
+    });
+  }
+};
+
+exports.updateUserProfile = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { name, email } = req.body;
+    
+    // Find the current user to check for avatar
+    const currentUser = await User.findById(userId);
+    if (!currentUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+    
+    // Prepare update data
+    const updateData = {
+      name,
+      email
+    };
+    
+    // If a new avatar is uploaded
+    if (req.file) {
+      // Upload new image to Cloudinary
+      const result = await cloudinary.v2.uploader.upload(
+        req.file.path,
+        {
+          folder: "avatars",
+          width: 200,
+          crop: "scale",
+        }
+      );
+      
+      // If user already has an avatar, delete the old one
+      if (currentUser.avatar && currentUser.avatar.public_id) {
+        await cloudinary.v2.uploader.destroy(currentUser.avatar.public_id);
+      }
+      
+      updateData.avatar = {
+        public_id: result.public_id,
+        url: result.url,
+      };
+    }
+    
+    // Update the user
+    const user = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      {
+        new: true,
+        runValidators: true
+      }
+    ).select("-password");
+    
+    res.status(200).json({
+      success: true,
+      user
+    });
+  } catch (error) {
+    console.error("Profile update error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error updating profile: " + error.message
+    });
+  }
+};

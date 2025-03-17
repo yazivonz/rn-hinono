@@ -9,9 +9,9 @@ const generateSecretKey = () => {
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: 'dlvhuve7b',
-  api_key: '955458541267245',
-  api_secret: 'rkWcakTyKVuyFY-rd3R6t49Ho6Y',
+  cloud_name: 'dah5hrzpp',
+  api_key: '956449799982761',
+  api_secret: 'qXlO74DuBFFeY3_I642YIk8ay5w',
 });
 
 const secretKey = generateSecretKey();
